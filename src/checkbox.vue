@@ -4,7 +4,9 @@
       color: titleColor,
     }"
     class="custom-checkbox"
-    ><input type="checkbox" v-model="is_checked" />{{ title }}</label
+    ><input type="checkbox" v-model="is_checked" @change="emitCheckedState" />{{
+      title
+    }}</label
   >
   <!-- <p>{{ state }}</p> -->
 </template>
@@ -23,14 +25,20 @@ export default defineComponent({
       default: '#42b983', // デフォルトのタイトルの色
     },
   },
-  setup(props) {
+  emits: ['update:is_checked'],
+  setup(props, { emit }) {
     const { title, titleColor } = toRefs(props);
     const is_checked = ref<boolean>(false);
+
+    const emitCheckedState = () => {
+      emit('update:is_checked', is_checked.value);
+    };
 
     return {
       title,
       titleColor,
       is_checked,
+      emitCheckedState,
     };
   },
 });
