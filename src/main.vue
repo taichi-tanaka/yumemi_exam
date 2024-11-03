@@ -1,4 +1,4 @@
-<!-- CheckBoxList.vue -->
+<!-- Main.vue -->
 <template>
   <div>
     <!-- 子コンポーネントに ref を設定し、イベントをリッスン -->
@@ -7,6 +7,7 @@
       @prefectures-loaded="handlePrefecturesLoaded"
       @error="handleError"
     />
+    <LoadPopulationData ref="populationLoader" />
 
     <!-- ローディング状態の表示 -->
     <div v-if="prefectureLoader?.is_loading">データを読み込み中...</div>
@@ -21,6 +22,7 @@
           <CheckBox
             :title="prefecture.prefName"
             v-model:is_checked="prefecture.is_checked"
+            @change="HandleCheckboxChange(prefecture)"
           />
         </li>
       </ul>
@@ -29,7 +31,7 @@
         {{ prefecture.prefName }}
       </p> -->
 
-      <p
+      <!-- <p
         v-if="prefectures && prefectures.length > 0"
         v-for="prefecture in prefectures.filter(
           pref => pref.is_checked === true
@@ -37,17 +39,62 @@
         :key="prefecture.prefCode"
       >
         {{ prefecture.prefName }}
-      </p>
+      </p> -->
+
+      <div
+        v-if="prefectures && prefectures.length > 0"
+        v-for="prefecture in prefectures.filter(
+          pref => pref.is_checked === true
+        )"
+        :key="prefecture.prefCode"
+      >
+        {{ prefecture.prefName }}<br />
+
+        <!-- 人口データのテーブル -->
+        <div class="table-container" v-if="prefecture.population">
+          <table>
+            <thead>
+              <tr>
+                <th>年</th>
+                <th>総人口</th>
+                <th>年少人口</th>
+                <th>生産年齢人口</th>
+                <th>老年人口</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="yearData in getYearData(prefecture)"
+                :key="yearData.year"
+              >
+                <td>{{ yearData.year }}年</td>
+                <td>{{ yearData.total.toLocaleString() }}</td>
+                <td>{{ yearData.young.toLocaleString() }}</td>
+                <td>{{ yearData.working.toLocaleString() }}</td>
+                <td>{{ yearData.elderly.toLocaleString() }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, Ref, onMounted, computed } from 'vue';
+import {
+  defineComponent,
+  ref,
+  Ref,
+  onMounted,
+  computed,
+  nextTick,
+  watch,
+} from 'vue';
 import CheckBox from './checkbox.vue';
 import LoadPrefectureID from './load_prefecture_id.vue';
 import LoadPopulationData from './load_population_data.vue';
-import { Prefecture, Population } from './types';
+import { Prefecture, Population, PopulationData } from './types';
 
 export default defineComponent({
   name: 'Main',
@@ -113,22 +160,46 @@ export default defineComponent({
       return prefectures.value.filter(pref => pref.is_checked === true);
     });
 
-    const GetPopulation = async () => {
-      if (populationLoader.value && prefectures && prefectures.length > 0) {
-        try {
-          for (let id = 0; id < prefectures.value.length; id++) {
-            const pref = prefectures.value[id];
-            if (pref.is_checked == true) {
-              const populationData = await populationLoader.value.GetPopulation(
-                pref.prefCode
-              );
-              pref.population.value = populationData;
-            }
-          }
-        } catch (error) {
-          console.error(error);
-        }
+    // チェックボックスの変更を処理する関数
+    const HandleCheckboxChange = async (prefecture: PrefectureCNV) => {
+      await nextTick();
+      if (prefecture.is_checked && !prefecture.population) {
+        await GetPopulation(prefecture);
       }
+    };
+
+    // 人口データを取得する関数
+    const GetPopulation = async (prefecture: PrefectureCNV) => {
+      try {
+        if (populationLoader.value) {
+          const populationData = await populationLoader.value.GetPopulation(
+            prefecture.prefCode
+          );
+          prefecture.population = populationData;
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    const getYearData = (prefecture: Prefecture) => {
+      if (!prefecture.population) return [];
+
+      const total = prefecture.population.total;
+      const young = prefecture.population.young;
+      const working = prefecture.population.working;
+      const elderly = prefecture.population.elderly;
+
+      // 年ごとにデータをマージ
+      return total.map((totalItem: PopulationData, index: number) => {
+        return {
+          year: totalItem.year,
+          total: totalItem.value,
+          young: young[index] ? young[index].value : 'N/A',
+          working: working[index] ? working[index].value : 'N/A',
+          elderly: elderly[index] ? elderly[index].value : 'N/A',
+        };
+      });
     };
 
     // 初期化時にデータを取得する場合
@@ -139,12 +210,15 @@ export default defineComponent({
     return {
       prefectures,
       prefectureLoader,
+      populationLoader,
       error,
       handlePrefecturesLoaded,
       handleError,
       GetData,
+      HandleCheckboxChange,
       GetPopulation,
       visibleItems,
+      getYearData,
     };
   },
 });
@@ -170,5 +244,29 @@ button {
   font-size: 16px;
   margin-top: 20px;
   cursor: pointer;
+}
+</style>
+
+<style>
+.table-container {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 2em;
+  min-width: 600px; /* テーブルの最小幅を設定 */
+}
+
+th,
+td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: right;
+}
+
+th {
+  background-color: #f2f2f2;
 }
 </style>

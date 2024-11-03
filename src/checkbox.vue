@@ -25,13 +25,14 @@ export default defineComponent({
       default: '#42b983', // デフォルトのタイトルの色
     },
   },
-  emits: ['update:is_checked'],
+  emits: ['update:is_checked', 'change'],
   setup(props, { emit }) {
     const { title, titleColor } = toRefs(props);
     const is_checked = ref<boolean>(false);
 
     const emitCheckedState = () => {
       emit('update:is_checked', is_checked.value);
+      emit('change', is_checked.value);
     };
 
     return {

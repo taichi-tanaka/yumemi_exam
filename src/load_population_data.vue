@@ -9,7 +9,7 @@ export default defineComponent({
   name: 'LoadPopulationData',
   //   emits: ['populations-loaded', 'error'],
   emits: ['error'],
-  setup(props, { emit, expose }) {
+  setup(_, { emit, expose }) {
     const is_loading = ref<boolean>(false);
     const error = ref<string | null>(null);
 
@@ -62,3 +62,5 @@ export default defineComponent({
   },
 });
 </script>
+
+<style></style>
