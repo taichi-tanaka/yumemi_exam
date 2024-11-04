@@ -4,8 +4,8 @@
     <!-- 子コンポーネントに ref を設定し、イベントをリッスン -->
     <LoadPrefectureID
       ref="prefectureLoader"
-      @prefectures-loaded="handlePrefecturesLoaded"
-      @error="handleError"
+      @prefectures-loaded="HandlePrefecturesLoaded"
+      @error="HandleError"
     />
     <LoadPopulationData ref="populationLoader" />
 
@@ -41,7 +41,7 @@
         {{ prefecture.prefName }}
       </p> -->
 
-      <div
+      <!-- <div
         v-if="prefectures && prefectures.length > 0"
         v-for="prefecture in prefectures.filter(
           pref => pref.is_checked === true
@@ -50,7 +50,6 @@
       >
         {{ prefecture.prefName }}<br />
 
-        <!-- 人口データのテーブル -->
         <div class="table-container" v-if="prefecture.population">
           <table>
             <thead>
@@ -76,6 +75,9 @@
             </tbody>
           </table>
         </div>
+      </div> -->
+      <div id="Main">
+        <CreateGraph ref="creategraphLoader" />
       </div>
     </div>
   </div>
@@ -94,6 +96,7 @@ import {
 import CheckBox from './checkbox.vue';
 import LoadPrefectureID from './load_prefecture_id.vue';
 import LoadPopulationData from './load_population_data.vue';
+import CreateGraph from './create_graph.vue';
 import { Prefecture, Population, PopulationData } from './types';
 
 export default defineComponent({
@@ -102,34 +105,40 @@ export default defineComponent({
     CheckBox,
     LoadPrefectureID,
     LoadPopulationData,
+    CreateGraph,
   },
   setup() {
-    type PrefectureCNV = Prefecture & {
+    type PrefectureCNB = Prefecture & {
       is_checked: Ref<boolean>;
     } & {
       population: Ref<Population | null>;
+    } & {
+      series_id: Ref<number | null>;
     };
-    const prefectures: Ref<PrefectureCNV[]> = ref([]);
+    const prefectures: Ref<PrefectureCNB[]> = ref([]);
 
     const prefectureLoader: Ref<InstanceType<typeof LoadPrefectureID> | null> =
       ref(null);
     const populationLoader: Ref<InstanceType<
       typeof LoadPopulationData
     > | null> = ref(null);
+    const creategraphLoader: Ref<InstanceType<typeof CreateGraph> | null> =
+      ref(null);
 
     const error = ref<string | null>(null);
 
     // イベントハンドラで prefectures を設定
-    const handlePrefecturesLoaded = (data: Prefecture[]) => {
+    const HandlePrefecturesLoaded = (data: Prefecture[]) => {
       prefectures.value = data.map(pref => ({
         ...pref,
         is_checked: ref<boolean>(false),
         population: ref(null),
+        series_id: ref(null),
       }));
       error.value = null;
     };
 
-    const handleError = (errorMessage: string) => {
+    const HandleError = (errorMessage: string) => {
       error.value = errorMessage;
     };
 
@@ -161,15 +170,18 @@ export default defineComponent({
     });
 
     // チェックボックスの変更を処理する関数
-    const HandleCheckboxChange = async (prefecture: PrefectureCNV) => {
-      await nextTick();
+    const HandleCheckboxChange = async (prefecture: PrefectureCNB) => {
+      // await nextTick();
       if (prefecture.is_checked && !prefecture.population) {
         await GetPopulation(prefecture);
+      }
+      if (prefecture.population) {
+        ChangeGraph(prefecture);
       }
     };
 
     // 人口データを取得する関数
-    const GetPopulation = async (prefecture: PrefectureCNV) => {
+    const GetPopulation = async (prefecture: PrefectureCNB) => {
       try {
         if (populationLoader.value) {
           const populationData = await populationLoader.value.GetPopulation(
@@ -202,6 +214,33 @@ export default defineComponent({
       });
     };
 
+    const ReshapeData = (dataArray: Population) => {
+      // データ配列をループして、[year, value]の形式で格納
+      const reshapedData = dataArray.map(item => [item.year, item.value]);
+
+      // [[year, value], ...] の形状で返す
+      return reshapedData;
+    };
+
+    const ChangeGraph = (prefecture: PrefectureCNB) => {
+      try {
+        if (creategraphLoader.value) {
+          if (prefecture.series_id == null) {
+            prefecture.series_id = creategraphLoader.value.AddDataToChart(
+              prefecture.prefName,
+              ReshapeData(prefecture.population.total)
+            );
+          } else if (prefecture.is_checked) {
+            creategraphLoader.value.VisibleSeries(prefecture.series_id);
+          } else {
+            creategraphLoader.value.HideSeries(prefecture.series_id);
+          }
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
     // 初期化時にデータを取得する場合
     onMounted(async () => {
       await GetData();
@@ -211,14 +250,17 @@ export default defineComponent({
       prefectures,
       prefectureLoader,
       populationLoader,
+      creategraphLoader,
       error,
-      handlePrefecturesLoaded,
-      handleError,
+      HandlePrefecturesLoaded,
+      HandleError,
       GetData,
       HandleCheckboxChange,
       GetPopulation,
       visibleItems,
       getYearData,
+      ReshapeData,
+      ChangeGraph,
     };
   },
 });
