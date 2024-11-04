@@ -16,13 +16,12 @@ export default defineComponent({
   },
   setup(_, { expose }) {
     const chartRef = ref(null); // chartRefを追加
-    const num_data = ref<number>(0);
     const chartOptions = ref({
       chart: {
         type: 'line',
       },
       title: {
-        text: 'グラフ',
+        text: '',
       },
       subtitle: {
         text: '',
@@ -46,15 +45,11 @@ export default defineComponent({
       series: [],
     });
 
-    const AddDataToChart = (name: string, data: [number, number][]) => {
-      //   let id = num_data.value;
-      //   chartOptions.value.series!.push({
-      //     name: name,
-      //     data: [...data],
-      //     type: 'line',
-      //   } as Highcharts.SeriesOptionsType);
-      //   num_data.value++;
-      //   return id;
+    const AddDataToSeries = (
+      name: string,
+      data: [number, number][],
+      visible: boolean = true
+    ) => {
       let id = chartOptions.value.series.length;
       chartOptions.value.series.push({
         name: name,
@@ -64,8 +59,57 @@ export default defineComponent({
       // インスタンス取得後にシリーズを再描画
       if (chartRef.value && chartRef.value.chart) {
         chartRef.value.chart.addSeries(chartOptions.value.series[id], true);
+        if (visible == true) {
+          VisibleSeries(id);
+        } else {
+          HideSeries(id);
+        }
       }
       return id;
+    };
+
+    const ChangeDataSeries = (id: number, data: [number, number][]) => {
+      if (chartRef.value && chartRef.value.chart) {
+        const chart = chartRef.value.chart;
+        if (chart.series[id]) {
+          const series = chart.series[id];
+          const Visible = series.visible;
+          const ShownInLegend = series.options.showInLegend;
+          chart.series[id].setData(data, false, false);
+
+          if (Visible) {
+            series.setVisible(true, true); // true: 再描画する
+          } else {
+            series.setVisible(false, true); // 非表示のまま再描画
+          }
+          series.update({ showInLegend: ShownInLegend }, true);
+        }
+      }
+    };
+
+    const ChangeYAxisTitle = (newTitle: string) => {
+      if (chartRef.value && chartRef.value.chart) {
+        const chart = chartRef.value.chart;
+        chart.update({
+          yAxis: {
+            title: {
+              text: newTitle,
+            },
+          },
+        });
+      }
+    };
+
+    const AllDelleteSeries = () => {
+      if (chartRef.value && chartRef.value.chart) {
+        const chart = chartRef.value.chart;
+        if (chart) {
+          // 全てのシリーズを削除
+          while (chart.series.length > 0) {
+            chart.series[0].remove(true);
+          }
+        }
+      }
     };
 
     const HideSeries = (id: number) => {
@@ -99,14 +143,16 @@ export default defineComponent({
 
     expose({
       chartRef,
-      AddDataToChart,
+      AddDataToSeries,
+      ChangeDataSeries,
+      ChangeYAxisTitle,
+      AllDelleteSeries,
       HideSeries,
       VisibleSeries,
     });
 
     return {
       chartRef,
-      num_data,
       chartOptions,
     };
   },

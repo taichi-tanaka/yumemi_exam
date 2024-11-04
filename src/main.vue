@@ -76,27 +76,24 @@
           </table>
         </div>
       </div> -->
-      <div id="Main">
-        <CreateGraph ref="creategraphLoader" />
-      </div>
+
+      <DropdownMenu
+        :list="['総人口', '年少人口', '生産年齢人口', '老年人口']"
+        @selected="HandleDropdownSelected"
+      ></DropdownMenu>
+
+      <CreateGraph ref="creategraphLoader" />
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  Ref,
-  onMounted,
-  computed,
-  nextTick,
-  watch,
-} from 'vue';
+import { defineComponent, ref, Ref, onMounted, computed } from 'vue';
 import CheckBox from './checkbox.vue';
 import LoadPrefectureID from './load_prefecture_id.vue';
 import LoadPopulationData from './load_population_data.vue';
 import CreateGraph from './create_graph.vue';
+import DropdownMenu from './dropdown_menu.vue';
 import { Prefecture, Population, PopulationData } from './types';
 
 export default defineComponent({
@@ -105,6 +102,7 @@ export default defineComponent({
     CheckBox,
     LoadPrefectureID,
     LoadPopulationData,
+    DropdownMenu,
     CreateGraph,
   },
   setup() {
@@ -124,6 +122,9 @@ export default defineComponent({
     > | null> = ref(null);
     const creategraphLoader: Ref<InstanceType<typeof CreateGraph> | null> =
       ref(null);
+
+    const dropdown_selected = ref<string>('総人口');
+    const unit = ref<string>('　人');
 
     const error = ref<string | null>(null);
 
@@ -176,7 +177,7 @@ export default defineComponent({
         await GetPopulation(prefecture);
       }
       if (prefecture.population) {
-        ChangeGraph(prefecture);
+        VisibleGraph(prefecture, dropdown_selected.value);
       }
     };
 
@@ -214,6 +215,27 @@ export default defineComponent({
       });
     };
 
+    const SelectedData = (population: Population, selected: string) => {
+      let data;
+      switch (selected) {
+        case '総人口':
+          data = population.total;
+          break;
+        case '年少人口':
+          data = population.young;
+          break;
+        case '生産年齢人口':
+          data = population.working;
+          break;
+        case '老年人口':
+          data = population.elderly;
+          break;
+        default:
+          throw new Error('無効な選択肢です');
+      }
+      return data;
+    };
+
     const ReshapeData = (dataArray: Population) => {
       // データ配列をループして、[year, value]の形式で格納
       const reshapedData = dataArray.map(item => [item.year, item.value]);
@@ -222,18 +244,50 @@ export default defineComponent({
       return reshapedData;
     };
 
-    const ChangeGraph = (prefecture: PrefectureCNB) => {
+    const VisibleGraph = (prefecture: PrefectureCNB, selected: string) => {
       try {
         if (creategraphLoader.value) {
           if (prefecture.series_id == null) {
-            prefecture.series_id = creategraphLoader.value.AddDataToChart(
+            prefecture.series_id = creategraphLoader.value.AddDataToSeries(
               prefecture.prefName,
-              ReshapeData(prefecture.population.total)
+              ReshapeData(SelectedData(prefecture.population, selected)),
+              true
             );
+            creategraphLoader.value.ChangeYAxisTitle(selected + unit.value);
           } else if (prefecture.is_checked) {
             creategraphLoader.value.VisibleSeries(prefecture.series_id);
           } else {
             creategraphLoader.value.HideSeries(prefecture.series_id);
+          }
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    const HandleDropdownSelected = (selected: string) => {
+      dropdown_selected.value = selected;
+      ChangeGraph(selected);
+    };
+
+    const ChangeGraph = (selected: string) => {
+      try {
+        if (
+          creategraphLoader.value &&
+          populationLoader.value &&
+          prefectures.value &&
+          prefectures.value.length > 0
+        ) {
+          creategraphLoader.value.ChangeYAxisTitle(selected + unit.value);
+
+          for (const prefecture of prefectures.value) {
+            // if (prefecture.is_checked) {
+            if (prefecture.series_id != null && prefecture.population != null) {
+              creategraphLoader.value.ChangeDataSeries(
+                prefecture.series_id,
+                ReshapeData(SelectedData(prefecture.population, selected))
+              );
+            }
           }
         }
       } catch (error) {
@@ -251,6 +305,7 @@ export default defineComponent({
       prefectureLoader,
       populationLoader,
       creategraphLoader,
+      dropdown_selected,
       error,
       HandlePrefecturesLoaded,
       HandleError,
@@ -259,7 +314,10 @@ export default defineComponent({
       GetPopulation,
       visibleItems,
       getYearData,
+      SelectedData,
       ReshapeData,
+      VisibleGraph,
+      HandleDropdownSelected,
       ChangeGraph,
     };
   },
