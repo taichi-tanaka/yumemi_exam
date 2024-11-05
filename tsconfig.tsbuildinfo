@@ -1,0 +1,1 @@
+{"root":["./src/main.ts","./src/types.ts","./src/vite-env.d.ts","./src/checkbox.vue","./src/create_graph.vue","./src/dropdown_menu.vue","./src/load_population_data.vue","./src/load_prefecture_id.vue","./src/main.vue","./tests/components/dropdown_menu.spec.ts"],"errors":true,"version":"5.6.3"}
