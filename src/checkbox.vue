@@ -49,5 +49,24 @@ export default defineComponent({
 .custom-checkbox {
   font-size: 18px;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 10px;
+}
+
+/* スマートフォン対応 */
+@media (max-width: 768px) {
+  .custom-checkbox {
+    font-size: 16px;
+    padding: 8px;
+  }
+}
+
+/* PC対応 */
+@media (min-width: 769px) {
+  .custom-checkbox {
+    font-size: 18px;
+    padding: 10px;
+  }
 }
 </style>

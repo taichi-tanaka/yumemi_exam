@@ -2,11 +2,7 @@
 <template>
   <div>
     <!-- 子コンポーネントに ref を設定し、イベントをリッスン -->
-    <LoadPrefectureID
-      ref="prefectureLoader"
-      @prefectures-loaded="HandlePrefecturesLoaded"
-      @error="HandleError"
-    />
+    <LoadPrefectureID ref="prefectureLoader" @error="HandleError" />
     <LoadPopulationData ref="populationLoader" />
 
     <!-- ローディング状態の表示 -->
@@ -78,11 +74,13 @@
       </div> -->
 
       <DropdownMenu
-        :list="['総人口', '年少人口', '生産年齢人口', '老年人口']"
+        :list="list"
+        v-model="dropdown_selected"
         @selected="HandleDropdownSelected"
-      ></DropdownMenu>
+      ></DropdownMenu
+      ><br />
 
-      <CreateGraph ref="creategraphLoader" />
+      <CreateGraph ref="creategraphLoader" :text_xaxis="'年'" :tooltip="'人'" />
     </div>
   </div>
 </template>
@@ -94,7 +92,7 @@ import LoadPrefectureID from './load_prefecture_id.vue';
 import LoadPopulationData from './load_population_data.vue';
 import CreateGraph from './create_graph.vue';
 import DropdownMenu from './dropdown_menu.vue';
-import { Prefecture, Population, PopulationData } from './types';
+import { Prefecture, Population } from './types';
 
 export default defineComponent({
   name: 'Main',
@@ -123,31 +121,31 @@ export default defineComponent({
     const creategraphLoader: Ref<InstanceType<typeof CreateGraph> | null> =
       ref(null);
 
-    const dropdown_selected = ref<string>('総人口');
-    const unit = ref<string>('　人');
+    const list: string[] = ['総人口', '年少人口', '生産年齢人口', '老年人口'];
+    const dropdown_selected = ref<string>(list[0]);
+    const unit = ref<string>('　[人]');
 
     const error = ref<string | null>(null);
-
-    // イベントハンドラで prefectures を設定
-    const HandlePrefecturesLoaded = (data: Prefecture[]) => {
-      prefectures.value = data.map(pref => ({
-        ...pref,
-        is_checked: ref<boolean>(false),
-        population: ref(null),
-        series_id: ref(null),
-      }));
-      error.value = null;
-    };
 
     const HandleError = (errorMessage: string) => {
       error.value = errorMessage;
     };
 
     // 子コンポーネントの getPrefectures を呼び出すメソッド
-    const GetData = async () => {
+    const GetPrefectureIDs = async () => {
       if (prefectureLoader.value) {
+        let data: Prefecture[] | null = null;
         try {
-          await prefectureLoader.value.GetPrefectures();
+          data = await prefectureLoader.value.GetPrefectures();
+          if (data) {
+            prefectures.value = data.map(pref => ({
+              ...pref,
+              is_checked: ref<boolean>(false),
+              population: ref(null),
+              series_id: ref(null),
+            }));
+            error.value = null;
+          }
         } catch (error) {
           console.error(error);
         }
@@ -253,7 +251,7 @@ export default defineComponent({
               ReshapeData(SelectedData(prefecture.population, selected)),
               true
             );
-            creategraphLoader.value.ChangeYAxisTitle(selected + unit.value);
+            creategraphLoader.value.SetYAxisTitle(selected + unit.value);
           } else if (prefecture.is_checked) {
             creategraphLoader.value.VisibleSeries(prefecture.series_id);
           } else {
@@ -266,7 +264,6 @@ export default defineComponent({
     };
 
     const HandleDropdownSelected = (selected: string) => {
-      dropdown_selected.value = selected;
       ChangeGraph(selected);
     };
 
@@ -278,7 +275,7 @@ export default defineComponent({
           prefectures.value &&
           prefectures.value.length > 0
         ) {
-          creategraphLoader.value.ChangeYAxisTitle(selected + unit.value);
+          creategraphLoader.value.SetYAxisTitle(selected + unit.value);
 
           for (const prefecture of prefectures.value) {
             // if (prefecture.is_checked) {
@@ -297,7 +294,7 @@ export default defineComponent({
 
     // 初期化時にデータを取得する場合
     onMounted(async () => {
-      await GetData();
+      await GetPrefectureIDs();
     });
 
     return {
@@ -305,11 +302,11 @@ export default defineComponent({
       prefectureLoader,
       populationLoader,
       creategraphLoader,
+      list,
       dropdown_selected,
       error,
-      HandlePrefecturesLoaded,
       HandleError,
-      GetData,
+      GetPrefectureIDs,
       HandleCheckboxChange,
       GetPopulation,
       visibleItems,
@@ -324,7 +321,7 @@ export default defineComponent({
 });
 </script>
 
-<style>
+<!-- <style>
 .checkbox-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr); /* 5列 */
@@ -338,16 +335,45 @@ export default defineComponent({
   text-align: left;
   margin-bottom: 8px;
 }
+</style> -->
 
-button {
-  padding: 8px 16px;
-  font-size: 16px;
-  margin-top: 20px;
-  cursor: pointer;
+<style>
+.checkbox-grid {
+  display: grid;
+  gap: 10px; /* 各チェックボックスの間のスペースを設定 */
+  list-style-type: none; /* バレットを非表示にする */
+  padding: 0; /* パディングを削除 */
+  margin: 0; /* マージンを削除 */
+}
+
+/* 大きな画面用のデフォルト設定 (デスクトップ) */
+@media (min-width: 1200px) {
+  .checkbox-grid {
+    grid-template-columns: repeat(7, 1fr);
+  }
+}
+
+/* 中サイズの画面用 (タブレット) */
+@media (min-width: 768px) and (max-width: 1199px) {
+  .checkbox-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+/* 小さい画面用 (スマートフォン) */
+@media (max-width: 767px) {
+  .checkbox-grid {
+    grid-template-columns: repeat(3, 1fr); /* 3列 */
+  }
+}
+
+.checkbox-grid li {
+  text-align: left;
+  margin-bottom: 8px;
 }
 </style>
 
-<style>
+<!-- <style>
 .table-container {
   overflow-x: auto;
 }
@@ -369,4 +395,4 @@ td {
 th {
   background-color: #f2f2f2;
 }
-</style>
+</style> -->
