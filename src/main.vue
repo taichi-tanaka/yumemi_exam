@@ -13,15 +13,17 @@
 
     <!-- 都道府県リストの表示 -->
     <div v-else-if="prefectures && prefectures.length > 0">
-      <ul class="checkbox-grid">
-        <li v-for="prefecture in prefectures" :key="prefecture.prefCode">
-          <CheckBox
-            :title="prefecture.prefName"
-            v-model:is_checked="prefecture.is_checked"
-            @change="HandleCheckboxChange(prefecture)"
-          />
-        </li>
-      </ul>
+      <div class="checkbox-container">
+        <ul class="checkbox-grid">
+          <li v-for="prefecture in prefectures" :key="prefecture.prefCode">
+            <CheckBox
+              :title="prefecture.prefName"
+              v-model:is_checked="prefecture.is_checked"
+              @change="HandleCheckboxChange(prefecture)"
+            />
+          </li>
+        </ul>
+      </div>
 
       <!-- <p v-for="prefecture in visibleItems" :key="prefecture.prefCode">
         {{ prefecture.prefName }}
@@ -234,7 +236,7 @@ export default defineComponent({
       return data;
     };
 
-    const ReshapeData = (dataArray: Population) => {
+    const ReshapeData = (dataArray: Population[]) => {
       // データ配列をループして、[year, value]の形式で格納
       const reshapedData = dataArray.map(item => [item.year, item.value]);
 
@@ -338,6 +340,14 @@ export default defineComponent({
 </style> -->
 
 <style>
+.checkbox-container {
+  display: flex; /* フレックスコンテナにする */
+  justify-content: center; /* 横方向の中央揃え */
+  align-items: center; /* 縦方向の中央揃え */
+  height: auto; /* 画面全体の高さから自動高さに変更することで無駄な余白を減らす */
+  padding: 10px; /* 必要に応じてパディングを小さく設定する */
+  margin: 0; /* 外側の余白を削除することで余白を減らす */
+}
 .checkbox-grid {
   display: grid;
   gap: 10px; /* 各チェックボックスの間のスペースを設定 */
@@ -369,7 +379,7 @@ export default defineComponent({
 
 .checkbox-grid li {
   text-align: left;
-  margin-bottom: 8px;
+  margin-bottom: 3px;
 }
 </style>
 

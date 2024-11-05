@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="dropdown-container">
     <select id="dropdown" v-model="selected" class="dropdown-select">
       <option v-for="item in list" :key="item" :value="item">{{ item }}</option>
     </select>
@@ -57,11 +57,18 @@ export default defineComponent({
 </script>
 
 <style scoped>
+.dropdown-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 .dropdown-select {
   padding: 8px;
   font-size: 16px;
   border-radius: 4px;
   border: 1px solid #ccc;
+  text-align: center;
 }
 
 @media (max-width: 768px) {

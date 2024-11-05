@@ -1,13 +1,31 @@
 <template>
-  <div class="chart-container">
+  <div ref="chartRef" class="chart-container">
     <highcharts :options="chartOptions" ref="chartRef"></highcharts>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, toRefs, onMounted, onBeforeUnmount } from 'vue';
+import {
+  defineComponent,
+  ref,
+  onMounted,
+  onBeforeUnmount,
+  ExtractPropTypes,
+  SetupContext,
+} from 'vue';
 import Highcharts from 'highcharts';
 import HighchartsVue from 'highcharts-vue';
+
+const propsDefinition = {
+  text_xaxis: {
+    type: String,
+    default: '',
+  },
+  tooltip: {
+    type: String,
+    default: '',
+  },
+};
 
 export default defineComponent({
   name: 'HighchartsLineChart',
@@ -24,9 +42,12 @@ export default defineComponent({
       default: '',
     },
   },
-  setup(props, { expose }) {
-    const chartRef = ref(null); // chartRefを追加
-    const chartOptions = ref({
+  setup(
+    props: ExtractPropTypes<typeof propsDefinition>,
+    { expose }: SetupContext
+  ) {
+    const chartRef = ref<null>(null);
+    const chartOptions = ref<Highcharts.Options>({
       chart: {
         type: 'line',
         events: {
@@ -90,14 +111,14 @@ export default defineComponent({
       data: [number, number][],
       visible: boolean = true
     ) => {
-      let id = chartOptions.value.series.length;
-      chartOptions.value.series.push({
+      let id = chartOptions.value.series?.length;
+      chartOptions.value.series?.push({
         name: name,
         data: [...data],
         type: 'line',
       } as Highcharts.SeriesOptionsType);
       // インスタンス取得後にシリーズを再描画
-      if (chartRef.value && chartRef.value.chart) {
+      if (chartRef.value && chartRef.value?.chart) {
         chartRef.value.chart.addSeries(chartOptions.value.series[id], true);
         if (visible == true) {
           VisibleSeries(id);
@@ -205,20 +226,9 @@ export default defineComponent({
     onMounted(() => {
       if (chartRef.value) {
         chartRef.value.chart = Highcharts.chart(
-          chartRef.value,
+          chartRef.value as HTMLElement,
           chartOptions.value
         );
-
-        // const observer = new ResizeObserver(() => {
-        //   if (chartRef.value && chartRef.value.chart) {
-        //     chartRef.value.chart.reflow();
-        //   }
-        // });
-
-        // const container = document.querySelector('.chart-container');
-        // if (container) {
-        //   observer.observe(container);
-        // }
 
         window.addEventListener('resize', resizeChart);
       }
@@ -251,6 +261,8 @@ export default defineComponent({
 
 <style scoped>
 .chart-container {
+  width: 100%;
+  max-width: 800px; /* 必要に応じて調整 */
   margin: 0 auto;
   display: flex;
   justify-content: center;
@@ -259,7 +271,7 @@ export default defineComponent({
 
 @media (min-width: 1200px) {
   .chart-container {
-    height: 100vh;
+    height: 60vh;
     width: 100%;
   }
 }
@@ -267,7 +279,7 @@ export default defineComponent({
 @media (min-width: 768px) and (max-width: 1199px) {
   .chart-container {
     height: 60vh;
-    width: 60vh;
+    width: 80vh;
   }
 }
 

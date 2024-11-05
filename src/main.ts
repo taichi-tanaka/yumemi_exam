@@ -1,5 +1,5 @@
 import { createApp } from 'vue';
-import './style.css';
+// import './style.css';
 // import App from './App2.vue';
 // import App from './App_testgraph.vue';
 // import HighchartsVue from 'highcharts-vue';
