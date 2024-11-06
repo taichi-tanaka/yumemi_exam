@@ -7,13 +7,12 @@ import { Prefecture, Population } from './types';
 
 export default defineComponent({
   name: 'LoadPopulationData',
-  //   emits: ['populations-loaded', 'error'],
   emits: ['error'],
   setup(_, { emit, expose }) {
     const is_loading = ref<boolean>(false);
     const error = ref<string | null>(null);
 
-    const GetPopulation = async (id: string) => {
+    const GetPopulation = async (id: string): Promise<Population | null> => {
       is_loading.value = true;
       error.value = null;
       const apiKey = import.meta.env.VITE_RESAS_API_KEY;

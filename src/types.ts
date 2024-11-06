@@ -4,7 +4,7 @@ export interface Prefecture {
   prefName: string;
 }
 
-interface PopulationData {
+export interface PopulationData {
   year: number;
   value: number;
 }

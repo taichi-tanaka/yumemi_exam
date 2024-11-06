@@ -1,6 +1,7 @@
 <template>
-  <div ref="chartRef" class="chart-container">
-    <highcharts :options="chartOptions" ref="chartRef"></highcharts>
+  <div class="chart-container">
+    <!-- <vue-highcharts :options="chartOptions" ref="chartRef"></vue-highcharts> -->
+    <vue-highcharts ref="chartRef" :options="chartOptions"></vue-highcharts>
   </div>
 </template>
 
@@ -13,8 +14,10 @@ import {
   ExtractPropTypes,
   SetupContext,
 } from 'vue';
-import Highcharts from 'highcharts';
-import HighchartsVue from 'highcharts-vue';
+import VueHighcharts from 'vue3-highcharts';
+// import Accessibility from 'highcharts/modules/accessibility';
+
+// Accessibility(VueHighcharts.Highcharts);
 
 const propsDefinition = {
   text_xaxis: {
@@ -28,37 +31,32 @@ const propsDefinition = {
 };
 
 export default defineComponent({
-  name: 'HighchartsLineChart',
+  name: 'CreateGraph',
   components: {
-    highcharts: HighchartsVue.component,
+    VueHighcharts,
   },
-  props: {
-    text_xaxis: {
-      type: String,
-      default: '',
-    },
-    tooltip: {
-      type: String,
-      default: '',
-    },
-  },
+  props: propsDefinition,
   setup(
     props: ExtractPropTypes<typeof propsDefinition>,
     { expose }: SetupContext
   ) {
-    const chartRef = ref<null>(null);
-    const chartOptions = ref<Highcharts.Options>({
+    const chartRef = ref<InstanceType<typeof VueHighcharts> | null>(null);
+    const chartOptions = ref<{
+      chart: { type: string };
+      title: { text: string };
+      subtitle: { text: string };
+      xAxis: {
+        type: string;
+        title: { text: string };
+        tickInterval: number;
+        allowDecimals: boolean;
+      };
+      yAxis: { title: { text: string } };
+      tooltip: { valueSuffix: string };
+      series: Array<{ name: string; data: [number, number][]; type: string }>;
+    }>({
       chart: {
         type: 'line',
-        events: {
-          load: function () {
-            const chart = this;
-            // ウィンドウリサイズ時にグラフのサイズを自動調整
-            window.addEventListener('resize', function () {
-              chart.reflow();
-            });
-          },
-        },
       },
       title: {
         text: '',
@@ -67,70 +65,60 @@ export default defineComponent({
         text: '',
       },
       xAxis: {
-        type: 'linear', // X軸を数値ベースに設定
+        type: 'linear',
         title: {
-          text: '',
+          text: props.text_xaxis,
         },
-        tickInterval: 1, // 年ごとの目盛りを表示
+        tickInterval: 1,
         allowDecimals: false,
       },
       yAxis: {
         title: {
-          text: props.text_xaxis,
+          text: '',
         },
       },
       tooltip: {
         valueSuffix: props.tooltip,
       },
       series: [],
-      // responsive: {
-      //   rules: [
-      //     {
-      //       condition: {
-      //         maxWidth: 500,
-      //       },
-      //       chartOptions: {
-      //         legend: {
-      //           align: 'center',
-      //           verticalAlign: 'bottom',
-      //           layout: 'horizontal',
-      //         },
-      //         yAxis: {
-      //           title: {
-      //             text: '',
-      //           },
-      //         },
-      //       },
-      //     },
-      //   ],
-      // },
     });
 
     const AddDataToSeries = (
       name: string,
       data: [number, number][],
       visible: boolean = true
-    ) => {
-      let id = chartOptions.value.series?.length;
-      chartOptions.value.series?.push({
+    ): Promise<number> => {
+      if (!chartOptions.value.series) {
+        chartOptions.value.series = [];
+      }
+
+      let id = chartOptions.value.series.length;
+      chartOptions.value.series.push({
         name: name,
         data: [...data],
         type: 'line',
-      } as Highcharts.SeriesOptionsType);
-      // インスタンス取得後にシリーズを再描画
-      if (chartRef.value && chartRef.value?.chart) {
-        chartRef.value.chart.addSeries(chartOptions.value.series[id], true);
-        if (visible == true) {
-          VisibleSeries(id);
+      });
+
+      if (chartRef.value?.chart) {
+        if (chartOptions.value.series[id]) {
+          chartRef.value.chart.addSeries(chartOptions.value.series[id], true);
+          if (visible) {
+            VisibleSeries(id);
+          } else {
+            HideSeries(id);
+          }
         } else {
-          HideSeries(id);
+          console.warn('Series IDが無効です。シリーズが存在しません。');
         }
+      } else {
+        console.warn('chartRefが存在しないため、シリーズを追加できません。');
       }
+
       return id;
     };
 
-    const ChangeDataSeries = (id: number, data: [number, number][]) => {
-      if (chartRef.value && chartRef.value.chart) {
+    const ChangeDataSeries = (id: number, data: [number, number][]): void => {
+      if (chartRef.value?.chart) {
         const chart = chartRef.value.chart;
         if (chart.series[id]) {
           const series = chart.series[id];
@@ -139,103 +127,111 @@ export default defineComponent({
           chart.series[id].setData(data, false, false);
 
           if (Visible) {
-            series.setVisible(true, true); // true: 再描画する
+            series.setVisible(true, true);
           } else {
-            series.setVisible(false, true); // 非表示のまま再描画
+            series.setVisible(false, true);
           }
-          series.update({ showInLegend: ShownInLegend }, true);
+          const currentOptions = series.options;
+          series.update(
+            {
+              ...currentOptions,
+              showInLegend: ShownInLegend,
+            },
+            true
+          );
         }
       }
     };
 
-    const SetXAxisTitle = (text: string) => {
-      if (chartRef.value && chartRef.value.chart) {
-        const chart = chartRef.value.chart;
-        chart.update({
-          xAxis: {
-            title: {
-              text: text,
+    const SetXAxisTitle = (text: string): void => {
+      if (chartRef.value?.chart) {
+        chartOptions.value.xAxis.title.text = text;
+        // chartRef.value.chart.update(chartOptions.value, true);
+        // chartRef.value.chart.reflow();
+        chartRef.value.chart.update(
+          {
+            xAxis: {
+              title: {
+                text: text,
+              },
             },
           },
-        });
+          true
+        );
       }
     };
 
-    const SetYAxisTitle = (text: string) => {
-      if (chartRef.value && chartRef.value.chart) {
-        const chart = chartRef.value.chart;
-        chart.update({
-          yAxis: {
-            title: {
-              text: text,
+    const SetYAxisTitle = (text: string): void => {
+      if (chartRef.value?.chart) {
+        chartOptions.value.yAxis.title.text = text;
+        // chartRef.value.chart.update(chartOptions.value, true);
+        // chartRef.value.chart.reflow();
+        chartRef.value.chart.update(
+          {
+            yAxis: {
+              title: {
+                text: text,
+              },
             },
           },
-        });
+          true
+        );
       }
     };
 
-    const SetTooltip = (text: string) => {
-      if (chartRef.value && chartRef.value.chart) {
-        const chart = chartRef.value.chart;
-        chart.update({
+    const SetTooltip = (text: string): void => {
+      if (chartRef.value?.chart) {
+        chartRef.value.chart.update({
           tooltip: {
-            valueSuffix: text, // ツールチップの後に付けるテキストを設定
+            valueSuffix: text,
           },
         });
       }
     };
 
-    const AllDelleteSeries = () => {
-      if (chartRef.value && chartRef.value.chart) {
+    const AllDelleteSeries = (): void => {
+      if (chartRef.value?.chart) {
         const chart = chartRef.value.chart;
-        if (chart) {
-          // 全てのシリーズを削除
-          while (chart.series.length > 0) {
-            chart.series[0].remove(true);
-          }
+        while (chart.series.length > 0) {
+          chart.series[0].remove(true);
         }
       }
     };
 
-    const HideSeries = (id: number) => {
-      if (chartRef.value && chartRef.value.chart) {
+    const HideSeries = (id: number): void => {
+      if (chartRef.value?.chart) {
         const chart = chartRef.value.chart;
         if (chart.series[id]) {
-          chart.series[id].setVisible(false, true); // シリーズを非表示にする
-          chart.series[id].update({ showInLegend: false });
+          const series = chart.series[id];
+          series.setVisible(false, true);
+          series.update({ showInLegend: false });
         }
       }
     };
 
-    const VisibleSeries = (id: number) => {
-      if (chartRef.value && chartRef.value.chart) {
+    const VisibleSeries = (id: number): void => {
+      if (chartRef.value?.chart) {
         const chart = chartRef.value.chart;
         if (chart.series[id]) {
-          chart.series[id].setVisible(true, true); // シリーズを表示にする
-          chart.series[id].update({ showInLegend: true });
+          const series = chart.series[id];
+          series.setVisible(true, true);
+          series.update({ showInLegend: true });
         }
       }
     };
 
-    const resizeChart = () => {
+    const ResizeChart = (): void => {
       if (chartRef.value && chartRef.value.chart) {
         chartRef.value.chart.reflow();
       }
     };
 
     onMounted(() => {
-      if (chartRef.value) {
-        chartRef.value.chart = Highcharts.chart(
-          chartRef.value as HTMLElement,
-          chartOptions.value
-        );
-
-        window.addEventListener('resize', resizeChart);
-      }
+      window.addEventListener('resize', ResizeChart);
     });
 
     onBeforeUnmount(() => {
-      window.removeEventListener('resize', resizeChart);
+      window.removeEventListener('resize', ResizeChart);
     });
 
     expose({
@@ -248,7 +244,7 @@ export default defineComponent({
       AllDelleteSeries,
       HideSeries,
       VisibleSeries,
-      resizeChart,
+      ResizeChart,
     });
 
     return {
@@ -262,14 +258,13 @@ export default defineComponent({
 <style scoped>
 .chart-container {
   width: 100%;
-  max-width: 800px; /* 必要に応じて調整 */
   margin: 0 auto;
   display: flex;
   justify-content: center;
   align-items: center;
 }
 
-@media (min-width: 1200px) {
+/* @media (min-width: 1200px) {
   .chart-container {
     height: 60vh;
     width: 100%;
@@ -288,5 +283,5 @@ export default defineComponent({
     height: 40vh;
     width: 40vh;
   }
-}
+} */
 </style>

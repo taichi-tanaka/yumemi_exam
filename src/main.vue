@@ -6,7 +6,9 @@
     <LoadPopulationData ref="populationLoader" />
 
     <!-- ローディング状態の表示 -->
-    <div v-if="prefectureLoader?.is_loading">データを読み込み中...</div>
+    <div v-if="prefectureLoader?.is_loading">
+      <span class="loading-string">データを読み込み中...</span>
+    </div>
 
     <!-- エラーメッセージの表示 -->
     <div v-else-if="error">{{ error }}</div>
@@ -94,7 +96,7 @@ import LoadPrefectureID from './load_prefecture_id.vue';
 import LoadPopulationData from './load_population_data.vue';
 import CreateGraph from './create_graph.vue';
 import DropdownMenu from './dropdown_menu.vue';
-import { Prefecture, Population } from './types';
+import { Prefecture, Population, PopulationData } from './types';
 
 export default defineComponent({
   name: 'Main',
@@ -108,15 +110,16 @@ export default defineComponent({
   setup() {
     type PrefectureCNB = Prefecture & {
       is_checked: Ref<boolean>;
-    } & {
-      population: Ref<Population | null>;
-    } & {
-      series_id: Ref<number | null>;
+      population: Population | null;
+      series_id: number | null;
     };
     const prefectures: Ref<PrefectureCNB[]> = ref([]);
 
-    const prefectureLoader: Ref<InstanceType<typeof LoadPrefectureID> | null> =
-      ref(null);
+    // const prefectureLoader: Ref<InstanceType<typeof LoadPrefectureID> | null> =
+    //   ref(null);
+    const prefectureLoader = ref<InstanceType<typeof LoadPrefectureID> | null>(
+      null
+    );
     const populationLoader: Ref<InstanceType<
       typeof LoadPopulationData
     > | null> = ref(null);
@@ -138,14 +141,16 @@ export default defineComponent({
       if (prefectureLoader.value) {
         let data: Prefecture[] | null = null;
         try {
-          data = await prefectureLoader.value.GetPrefectures();
+          // data = await prefectureLoader.value.GetPrefectures();
+          data = await (prefectureLoader.value as any).GetPrefectures();
           if (data) {
             prefectures.value = data.map(pref => ({
               ...pref,
               is_checked: ref<boolean>(false),
-              population: ref(null),
-              series_id: ref(null),
+              population: null,
+              series_id: null,
             }));
+
             error.value = null;
           }
         } catch (error) {
@@ -167,13 +172,12 @@ export default defineComponent({
       //   }
       // }
       // return selectedPrefectures; // 条件に合う都道府県リストを返す
-      return prefectures.value.filter(pref => pref.is_checked === true);
+      return prefectures.value.filter(pref => pref.is_checked.value === true);
     });
 
     // チェックボックスの変更を処理する関数
     const HandleCheckboxChange = async (prefecture: PrefectureCNB) => {
-      // await nextTick();
-      if (prefecture.is_checked && !prefecture.population) {
+      if (prefecture.is_checked && prefecture.population == null) {
         await GetPopulation(prefecture);
       }
       if (prefecture.population) {
@@ -183,11 +187,13 @@ export default defineComponent({
 
     // 人口データを取得する関数
     const GetPopulation = async (prefecture: PrefectureCNB) => {
+      let populationData: Population | null = null;
       try {
         if (populationLoader.value) {
-          const populationData = await populationLoader.value.GetPopulation(
+          populationData = await (populationLoader.value as any).GetPopulation(
             prefecture.prefCode
           );
+
           prefecture.population = populationData;
         }
       } catch (error) {
@@ -195,13 +201,19 @@ export default defineComponent({
       }
     };
 
-    const getYearData = (prefecture: Prefecture) => {
-      if (!prefecture.population) return [];
+    const getYearData = (prefecture: PrefectureCNB) => {
+      if (prefecture.population == null) {
+        return [];
+      }
 
-      const total = prefecture.population.total;
-      const young = prefecture.population.young;
-      const working = prefecture.population.working;
-      const elderly = prefecture.population.elderly;
+      let population: Population | null = prefecture.population;
+      if (population === null) {
+        return [];
+      }
+      let total: PopulationData[] = population.total;
+      let young: PopulationData[] = population.young;
+      let working: PopulationData[] = population.working;
+      let elderly: PopulationData[] = population.elderly;
 
       // 年ごとにデータをマージ
       return total.map((totalItem: PopulationData, index: number) => {
@@ -215,8 +227,12 @@ export default defineComponent({
       });
     };
 
-    const SelectedData = (population: Population, selected: string) => {
-      let data;
+    const SelectedData = (population: Population | null, selected: string) => {
+      let data: PopulationData[] = [];
+      if (population === null) {
+        return data;
+      }
+
       switch (selected) {
         case '総人口':
           data = population.total;
@@ -236,9 +252,12 @@ export default defineComponent({
       return data;
     };
 
-    const ReshapeData = (dataArray: Population[]) => {
+    const ReshapeData = (dataArray: PopulationData[]) => {
       // データ配列をループして、[year, value]の形式で格納
-      const reshapedData = dataArray.map(item => [item.year, item.value]);
+      const reshapedData = (dataArray as PopulationData[]).map(item => [
+        item?.year ?? null,
+        item?.value ?? null,
+      ]);
 
       // [[year, value], ...] の形状で返す
       return reshapedData;
@@ -248,16 +267,22 @@ export default defineComponent({
       try {
         if (creategraphLoader.value) {
           if (prefecture.series_id == null) {
-            prefecture.series_id = creategraphLoader.value.AddDataToSeries(
+            prefecture.series_id = (
+              creategraphLoader.value as any
+            ).AddDataToSeries(
               prefecture.prefName,
               ReshapeData(SelectedData(prefecture.population, selected)),
               true
             );
-            creategraphLoader.value.SetYAxisTitle(selected + unit.value);
+            (creategraphLoader.value as any).SetYAxisTitle(
+              selected + unit.value
+            );
           } else if (prefecture.is_checked) {
-            creategraphLoader.value.VisibleSeries(prefecture.series_id);
+            (creategraphLoader.value as any).VisibleSeries(
+              prefecture.series_id
+            );
           } else {
-            creategraphLoader.value.HideSeries(prefecture.series_id);
+            (creategraphLoader.value as any).HideSeries(prefecture.series_id);
           }
         }
       } catch (error) {
@@ -277,12 +302,11 @@ export default defineComponent({
           prefectures.value &&
           prefectures.value.length > 0
         ) {
-          creategraphLoader.value.SetYAxisTitle(selected + unit.value);
+          (creategraphLoader.value as any).SetYAxisTitle(selected + unit.value);
 
           for (const prefecture of prefectures.value) {
-            // if (prefecture.is_checked) {
             if (prefecture.series_id != null && prefecture.population != null) {
-              creategraphLoader.value.ChangeDataSeries(
+              (creategraphLoader.value as any).ChangeDataSeries(
                 prefecture.series_id,
                 ReshapeData(SelectedData(prefecture.population, selected))
               );
@@ -340,6 +364,17 @@ export default defineComponent({
 </style> -->
 
 <style>
+.loading-string {
+  position: fixed; /* 画面全体に対して中央配置するため */
+  top: 50%; /* 縦方向の中央 */
+  left: 50%; /* 横方向の中央 */
+  transform: translate(-50%, -50%); /* 正確に中央に配置するために位置を調整 */
+  display: flex; /* フレックスボックスを使用 */
+  justify-content: center; /* 横方向に中央揃え */
+  align-items: center; /* 縦方向に中央揃え */
+  font-size: 1.5em; /* 必要に応じて文字のサイズを変更 */
+  text-align: center; /* 文字の中央揃え */
+}
 .checkbox-container {
   display: flex; /* フレックスコンテナにする */
   justify-content: center; /* 横方向の中央揃え */
